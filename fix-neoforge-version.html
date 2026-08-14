@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>app.db Loader Version Fix</title>
+<style>
+  :root {
+    --bark: #2b2420;
+    --stone: #3d372f;
+    --parchment: #ece3d2;
+    --moss: #6b8f5a;
+    --moss-dark: #55703f;
+    --clay: #a5644a;
+    --error: #b3452f;
+    --line: #5a5245;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 40px 20px;
+    background: var(--bark);
+    background-image:
+      linear-gradient(180deg, rgba(0,0,0,0.15), rgba(0,0,0,0.15));
+    color: var(--parchment);
+    font-family: 'Courier New', ui-monospace, monospace;
+    display: flex;
+    justify-content: center;
+  }
+
+  .panel {
+    width: 100%;
+    max-width: 620px;
+    background: var(--stone);
+    border: 3px solid var(--line);
+    box-shadow: inset 0 0 0 3px rgba(0,0,0,0.25), 0 6px 0 rgba(0,0,0,0.35);
+    padding: 28px 30px 34px;
+  }
+
+  h1 {
+    font-size: 1.15rem;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    margin: 0 0 4px;
+    color: var(--moss);
+  }
+
+  .sub {
+    font-size: 0.82rem;
+    color: #c9bfa9;
+    margin: 0 0 22px;
+    line-height: 1.5;
+  }
+
+  .rule {
+    border: none;
+    border-top: 2px dashed var(--line);
+    margin: 20px 0;
+  }
+
+  .copy-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .copy-path {
+    flex: 1;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--line);
+    padding: 9px 10px;
+    font-size: 0.78rem;
+    color: var(--parchment);
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .copy-btn {
+    flex: 0 0 auto;
+    width: auto;
+    margin: 0;
+    padding: 9px 14px;
+    font-size: 0.78rem;
+    background: var(--moss);
+    color: #1c2417;
+    box-shadow: 0 2px 0 rgba(0,0,0,0.35);
+  }
+  .copy-btn:hover { background: var(--moss-dark); }
+  .copy-btn:active { transform: translateY(1px); box-shadow: 0 1px 0 rgba(0,0,0,0.35); }
+  .copy-btn.copied { background: var(--clay); color: #2b1b13; }
+
+  label.dropzone {
+    display: block;
+    border: 2px dashed var(--line);
+    padding: 22px;
+    text-align: center;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: #c9bfa9;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  label.dropzone:hover { border-color: var(--moss); color: var(--parchment); }
+  input[type="file"] { display: none; }
+
+  .step {
+    display: none;
+    margin-top: 20px;
+  }
+  .step.active { display: block; }
+
+  .row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--line);
+    font-size: 0.85rem;
+  }
+  .row span:first-child { color: #c9bfa9; }
+  .row span:last-child { text-align: right; }
+
+  .badge {
+    padding: 2px 8px;
+    border-radius: 2px;
+    font-weight: bold;
+  }
+  .badge.old { background: var(--error); color: white; }
+  .badge.new { background: var(--moss-dark); color: white; }
+
+  button {
+    font-family: inherit;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 12px 18px;
+    border: none;
+    box-shadow: 0 3px 0 rgba(0,0,0,0.35);
+    cursor: pointer;
+    width: 100%;
+    margin-top: 18px;
+    transition: transform 0.05s;
+  }
+  button:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,0.35); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .btn-primary { background: var(--moss); color: #1c2417; }
+  .btn-primary:hover:not(:disabled) { background: var(--moss-dark); }
+
+  .btn-clay { background: var(--clay); color: #2b1b13; }
+  .btn-clay:hover:not(:disabled) { background: #8f5340; }
+
+  .msg {
+    margin-top: 14px;
+    font-size: 0.82rem;
+    line-height: 1.5;
+    padding: 10px 12px;
+    border-left: 3px solid var(--moss);
+    background: rgba(0,0,0,0.15);
+  }
+  .msg.error { border-left-color: var(--error); }
+
+  .note {
+    font-size: 0.75rem;
+    color: #9a9082;
+    margin-top: 22px;
+    line-height: 1.6;
+  }
+
+  code {
+    background: rgba(0,0,0,0.3);
+    padding: 1px 5px;
+    border-radius: 2px;
+  }
+</style>
+</head>
+<body>
+
+<div class="panel">
+  <h1>Loader Version Fix</h1>
+  <p class="sub">
+    Corrects the NeoForge loader version stored for your linked modpack instance in
+    <code>app.db</code>. Everything runs locally in this page — the file is never uploaded anywhere.
+  </p>
+
+  <hr class="rule">
+
+  <!-- Step 1: load file -->
+  <div class="step active" id="step-load">
+    <div class="copy-row">
+      <div class="copy-path" id="pathText">%appdata%\ModrinthApp\app.db</div>
+      <button class="copy-btn" id="copyPathBtn" type="button">Copy Path</button>
+    </div>
+    <p class="sub" style="margin-top:-4px;">
+      Paste this into the address bar of the file picker, since it can't be pre-filled for you.
+    </p>
+    <label class="dropzone" for="fileInput" id="dropLabel">
+      Click to select your <code>app.db</code> file<br>
+      <small>Usually at %appdata%\ModrinthApp\app.db</small>
+    </label>
+    <input type="file" id="fileInput" accept=".db">
+    <div id="loadMsg"></div>
+  </div>
+
+  <!-- Step 2: review -->
+  <div class="step" id="step-review">
+    <div class="row"><span>Ref ID</span><span id="refIdOut">—</span></div>
+    <div class="row"><span>Content Set ID</span><span id="contentSetIdOut">—</span></div>
+    <div class="row"><span>Current loader_version</span><span id="oldValOut" class="badge old">—</span></div>
+    <div class="row"><span>New loader_version</span><span id="newValOut" class="badge new">21.1.248</span></div>
+    <button class="btn-primary" id="applyBtn">Apply Fix</button>
+    <div id="reviewMsg"></div>
+  </div>
+
+  <!-- Step 3: download -->
+  <div class="step" id="step-download">
+    <div class="msg">Fix applied. Download the corrected file and replace your original <code>app.db</code> with it (close the Modrinth App first).</div>
+    <button class="btn-clay" id="downloadBtn">Download Fixed app.db</button>
+  </div>
+
+  <div class="note">
+    This only changes one value: <code>loader_version</code> in <code>instance_content_sets</code>,
+    for the row whose <code>id</code> matches the <code>content_set_id</code> found via
+    <code>instance_content_set_remote_refs</code> where <code>ref_id = 'h7wfiQ7e'</code>.
+    Close the Modrinth App before replacing the file.
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
+<script>
+const REF_ID = 'h7wfiQ7e';
+const NEW_VERSION = '21.1.248';
+
+let SQL, db, fileBytes, foundContentSetId, oldValue, dbFileName = 'app.db';
+
+const fileInput = document.getElementById('fileInput');
+const loadMsg = document.getElementById('loadMsg');
+const stepLoad = document.getElementById('step-load');
+const stepReview = document.getElementById('step-review');
+const stepDownload = document.getElementById('step-download');
+const applyBtn = document.getElementById('applyBtn');
+const reviewMsg = document.getElementById('reviewMsg');
+const downloadBtn = document.getElementById('downloadBtn');
+
+function showMsg(el, text, isError) {
+  el.innerHTML = `<div class="msg${isError ? ' error' : ''}">${text}</div>`;
+}
+
+const copyPathBtn = document.getElementById('copyPathBtn');
+const pathText = document.getElementById('pathText').textContent;
+
+copyPathBtn.addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(pathText);
+  } catch (err) {
+    const ta = document.createElement('textarea');
+    ta.value = pathText;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  }
+  copyPathBtn.textContent = 'Copied!';
+  copyPathBtn.classList.add('copied');
+  setTimeout(() => {
+    copyPathBtn.textContent = 'Copy Path';
+    copyPathBtn.classList.remove('copied');
+  }, 1600);
+});
+
+fileInput.addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  dbFileName = file.name || 'app.db';
+  loadMsg.innerHTML = '';
+
+  try {
+    if (!SQL) {
+      SQL = await initSqlJs({
+        locateFile: f => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/${f}`
+      });
+    }
+
+    const buf = await file.arrayBuffer();
+    fileBytes = new Uint8Array(buf);
+    db = new SQL.Database(fileBytes);
+
+    const refRes = db.exec(
+      `SELECT content_set_id FROM instance_content_set_remote_refs WHERE ref_id = '${REF_ID}';`
+    );
+
+    if (!refRes.length || !refRes[0].values.length) {
+      showMsg(loadMsg, `Could not find a row with ref_id <code>${REF_ID}</code> in <code>instance_content_set_remote_refs</code>. Make sure this is the right app.db file.`, true);
+      return;
+    }
+
+    foundContentSetId = refRes[0].values[0][0];
+
+    const setRes = db.exec(
+      `SELECT loader_version FROM instance_content_sets WHERE id = ${typeof foundContentSetId === 'string' ? `'${foundContentSetId}'` : foundContentSetId};`
+    );
+
+    if (!setRes.length || !setRes[0].values.length) {
+      showMsg(loadMsg, `Found content_set_id <code>${foundContentSetId}</code> but no matching row in <code>instance_content_sets</code>.`, true);
+      return;
+    }
+
+    oldValue = setRes[0].values[0][0];
+
+    document.getElementById('refIdOut').textContent = REF_ID;
+    document.getElementById('contentSetIdOut').textContent = foundContentSetId;
+    document.getElementById('oldValOut').textContent = oldValue;
+
+    if (String(oldValue) === NEW_VERSION) {
+      showMsg(loadMsg, `Heads up: loader_version is already <code>${NEW_VERSION}</code>. No fix needed, but you can still re-apply if you want.`, false);
+    }
+
+    stepLoad.classList.remove('active');
+    stepReview.classList.add('active');
+  } catch (err) {
+    console.error(err);
+    showMsg(loadMsg, `Something went wrong reading this file: ${err.message}. Make sure it's a valid app.db SQLite file.`, true);
+  }
+});
+
+applyBtn.addEventListener('click', () => {
+  try {
+    const idLiteral = typeof foundContentSetId === 'string' ? `'${foundContentSetId}'` : foundContentSetId;
+    db.run(
+      `UPDATE instance_content_sets SET loader_version = '${NEW_VERSION}' WHERE id = ${idLiteral};`
+    );
+
+    applyBtn.disabled = true;
+    stepReview.classList.remove('active');
+    stepDownload.classList.add('active');
+  } catch (err) {
+    console.error(err);
+    showMsg(reviewMsg, `Failed to apply the fix: ${err.message}`, true);
+  }
+});
+
+downloadBtn.addEventListener('click', () => {
+  const data = db.export();
+  const blob = new Blob([data], { type: 'application/octet-stream' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = dbFileName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+</script>
+
+</body>
+</html>
